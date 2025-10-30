@@ -1,0 +1,15 @@
+/* CSS สำหรับซ่อน artwork บน YouTube Music */
+
+.artwork-hidden {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+/* เพิ่ม transition ให้กับ artwork ทั้งหมด */
+#song-image,
+.image.ytmusic-player-page,
+.player-page-image,
+ytmusic-player-page img {
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}

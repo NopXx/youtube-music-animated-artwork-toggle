@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Icon Generator</title>
+</head>
+<body>
+  <h2>Icon Generator for YouTube Music Artwork Toggle</h2>
+
+  <canvas id="icon128" width="128" height="128"></canvas>
+  <canvas id="icon48" width="48" height="48"></canvas>
+  <canvas id="icon16" width="16" height="16"></canvas>
+
+  <div>
+    <button onclick="downloadIcons()">Download Icons</button>
+  </div>
+
+  <script>
+    function createIcon(canvas, size) {
+      const ctx = canvas.getContext('2d');
+
+      // Background gradient
+      const gradient = ctx.createLinearGradient(0, 0, size, size);
+      gradient.addColorStop(0, '#667eea');
+      gradient.addColorStop(1, '#764ba2');
+
+      // Draw circle background
+      ctx.beginPath();
+      ctx.arc(size/2, size/2, size/2, 0, 2 * Math.PI);
+      ctx.fillStyle = gradient;
+      ctx.fill();
+
+      // Draw music note
+      ctx.fillStyle = 'white';
+      ctx.font = `bold ${size * 0.5}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🎵', size/2, size/2);
+    }
+
+    // Create icons
+    createIcon(document.getElementById('icon128'), 128);
+    createIcon(document.getElementById('icon48'), 48);
+    createIcon(document.getElementById('icon16'), 16);
+
+    function downloadIcons() {
+      ['icon128', 'icon48', 'icon16'].forEach(id => {
+        const canvas = document.getElementById(id);
+        const link = document.createElement('a');
+        link.download = id + '.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      });
+    }
+  </script>
+</body>
+</html>
