@@ -119,7 +119,7 @@ async function searchAppleMusicUrl(songTitle, artist, album) {
       try {
         const countryParam = country ? `&country=${country}` : '';
         const response = await fetch(
-          `https://itunes.apple.com/search?term=${encodedTerm}&entity=song&limit=10${countryParam}`,
+          `https://itunes.apple.com/search?term=${encodedTerm}&entity=song&limit=4${countryParam}`,
           { signal: controller.signal }
         );
 
