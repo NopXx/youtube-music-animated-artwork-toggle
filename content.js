@@ -1,8 +1,20 @@
 // Content script สำหรับ YouTube Music Animated Artwork
 
 let currentSongInfo = null;
+let currentSongKey = null;
 let videoElement = null;
 let originalArtwork = null;
+const animationCache = new Map();
+
+function getSongKey(info) {
+  if (!info) {
+    return '';
+  }
+
+  return [info.title, info.artist, info.album]
+    .map((value) => (value ?? '').toString().trim().toLowerCase())
+    .join('|||');
+}
 
 // ฟังก์ชันดึงข้อมูลเพลงจาก YouTube Music
 function getCurrentSongInfo() {
@@ -209,16 +221,32 @@ async function loadAnimatedArtwork() {
     return;
   }
 
-  // ตรวจสอบว่าเป็นเพลงเดิมหรือไม่
-  if (currentSongInfo &&
-      currentSongInfo.title === songInfo.title &&
-      currentSongInfo.artist === songInfo.artist &&
-      currentSongInfo.album === songInfo.album) {
+  const songKey = getSongKey(songInfo);
+  const cachedResult = animationCache.get(songKey);
+  const isSameSong = currentSongKey === songKey;
+
+  if (isSameSong && videoElement) {
     return;
   }
 
   currentSongInfo = songInfo;
-  console.log('New song detected:', songInfo);
+  currentSongKey = songKey;
+
+  if (!videoElement && cachedResult?.status === 'success') {
+    console.log('Reusing cached animated artwork for current song');
+    displayAnimatedArtwork(cachedResult.url);
+    return;
+  }
+
+  if (cachedResult?.status === 'failure') {
+    return;
+  }
+
+  if (isSameSong) {
+    console.log('Attempting to reapply animated artwork for current song');
+  } else {
+    console.log('New song detected:', songInfo);
+  }
 
   // ค้นหา Apple Music URL
   const appleMusicUrl = await searchAppleMusicUrl(songInfo.title, songInfo.artist, songInfo.album);
@@ -230,6 +258,7 @@ async function loadAnimatedArtwork() {
 
   if (!appleMusicUrl) {
     console.log('Apple Music URL not found');
+    animationCache.set(songKey, { status: 'failure' });
     restoreOriginalArtwork();
     return;
   }
@@ -245,9 +274,11 @@ async function loadAnimatedArtwork() {
   }
 
   if (animatedUrl) {
+    animationCache.set(songKey, { status: 'success', url: animatedUrl });
     displayAnimatedArtwork(animatedUrl);
   } else {
     console.log('Animated artwork not available for this song');
+    animationCache.set(songKey, { status: 'failure' });
     restoreOriginalArtwork();
   }
 }

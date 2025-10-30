@@ -1,53 +1,55 @@
 # YouTube Music Animated Artwork Toggle
 
-ส่วนขยาย Chrome ที่ช่วยดึงและแสดงผล animated album artwork จาก Apple Music ให้กับเพลงที่กำลังเล่นบนหน้า YouTube Music โดยสามารถสลับเปิด/ปิดได้ทันทีจาก popup ของส่วนขยาย
+A Chrome extension that replaces the static album art on YouTube Music with Apple Music's animated artwork (when available). Toggle the feature on/off instantly from the popup.
+
+Looking for another language? Read the Thai translation in `README.th.md`.
 
 ## Highlights
 
-- แสดงผล animated artwork แบบ real-time ด้วยวิดีโอที่มีคุณภาพสูง
-- ดึงข้อมูลจาก Apple Music API พร้อมตรวจสอบความตรงกันของเพลงแบบ case-insensitive และรองรับชื่ออัลบั้มที่มีคำต่อท้าย (Deluxe Edition ฯลฯ)
-- มี fallback กลับไปใช้ artwork ปกติทันทีเมื่อไม่พบวิดีโอสำหรับเพลงถัดไป ลดอาการค้างคาของวิดีโอเดิม
-- จำสถานะการเปิด/ปิดของผู้ใช้ใน Chrome Storage
+- Live animated artwork rendered as a looping video overlay
+- Smart Apple Music matching with case-insensitive comparisons and album title fuzziness for deluxe or alternate releases
+- Automatic fallback to the original art whenever no animation exists for the current track
+- Remembers the toggle state using the Chrome Storage API
 
-## การติดตั้ง (โหมดนักพัฒนา)
+## Installation (Developer Mode)
 
-1. ดาวน์โหลดหรือ `git clone` โฟลเดอร์ `youtube-music-artwork-toggle`
-2. เปิด Chrome ไปที่ `chrome://extensions/`
-3. เปิด "Developer mode" (ปุ่มด้านขวาบน)
-4. คลิก "Load unpacked" แล้วเลือกโฟลเดอร์โปรเจ็กต์นี้
-5. (ตัวเลือก) หากต้องการสร้างไอคอนใหม่ เปิด `icons/create-icons.html` แล้วคลิก "Download Icons" เพื่อนำไฟล์ไปวางไว้ในโฟลเดอร์ `icons/`
+1. Download or `git clone` this repository: `youtube-music-artwork-toggle`
+2. Open Chrome and navigate to `chrome://extensions/`
+3. Enable **Developer mode** (top-right toggle)
+4. Click **Load unpacked** and select the project folder
+5. (Optional) Generate icons via `icons/create-icons.html` and place the downloaded PNGs inside the `icons/` directory
 
-## วิธีใช้งาน
+## Usage
 
-1. เปิด https://music.youtube.com และเริ่มเล่นเพลง
-2. คลิกไอคอนส่วนขยายบน Chrome toolbar
-3. ใช้ toggle เพื่อเปิด/ปิดการใช้งาน animated artwork
-4. เมื่อเปิดใช้งาน ส่วนขยายจะค้นหา Apple Music URL ที่ตรงกับเพลงปัจจุบันและสลับ artwork ให้โดยอัตโนมัติ
+1. Open https://music.youtube.com and start playing a song
+2. Click the extension icon in the Chrome toolbar
+3. Toggle the switch to enable animated artwork
+4. The extension looks up the current song on Apple Music and swaps the artwork automatically when a match is found
 
-## โครงสร้างไฟล์หลัก
+## Project Layout
 
 ```
 youtube-music-artwork-toggle/
-├── background.js       # ทำงานใน background: ค้นหา Apple Music และดึง animated artwork
-├── content.js          # รันบนหน้า YouTube Music: ตรวจเพลง, สลับ artwork, จัดการ DOM
+├── background.js       # Service worker: Apple Music lookup + animated-art fetch
+├── content.js          # Runs on YouTube Music: song detection, DOM updates
 ├── manifest.json       # Chrome Extension Manifest V3
-├── popup.html/.css/.js # UI toggle สำหรับผู้ใช้
-├── styles.css          # สไตล์เพิ่มเติมสำหรับฝั่ง content script
-└── icons/              # ไฟล์ไอคอนและเครื่องมือสร้างไอคอน
+├── popup.html/.css/.js # Popup UI and toggle logic
+├── styles.css          # Additional styling injected into the page
+└── icons/              # Icon assets and icon-generation helper
 ```
 
-## การพัฒนา
+## Development Tips
 
-- ปิดและเปิด toggle เพื่อทดสอบสถานะการบันทึกใน `chrome.storage.local`
-- ทดลองเล่นเพลงที่มี/ไม่มี animated artwork เพื่อตรวจสอบการ fallback กลับไปยังภาพนิ่ง
-- หากต้องการ debug เพิ่มเติม สามารถเปิด DevTools ในหน้า YouTube Music (แท็บ Console) และในพื้นหลังส่วนขยาย (`chrome://extensions/` > คลิก Service Worker)
+- Flip the popup toggle to verify the stored state in `chrome.storage.local`
+- Test with songs that do and do not have animated artwork to confirm fallback behavior
+- Debug the content script via DevTools on the YouTube Music tab, and the background worker through `chrome://extensions/` (open the service worker console)
 
-## ข้อควรทราบ
+## Notes
 
-- ทำงานเฉพาะบน `music.youtube.com`
-- หากไม่พบ Apple Music URL หรือ animated artwork ส่วนขยายจะคืนค่า artwork ปกติให้โดยอัตโนมัติ
-- Apple Music API มีการจำกัดจำนวนคำค้นหาและความเร็วการตอบกลับ ควรตรวจสอบ log หากเกิด timeout
+- Works only on `https://music.youtube.com`
+- When Apple Music returns no animated clip, the original static artwork is restored immediately
+- Apple Music API rate limits and timeouts can occur; check the console logs for diagnostics
 
 ## License
 
-โค้ดเผยแพร่ภายใต้ MIT License ใช้งาน แก้ไข และแจกจ่ายได้อย่างอิสระ
+MIT License

@@ -13,58 +13,218 @@ function checkExtensionContext() {
 // ฟังก์ชันค้นหา Apple Music URL
 async function searchAppleMusicUrl(songTitle, artist, album) {
   try {
-    // จัดรูปแบบเป็น artist,album,track และแทนที่ช่องว่างด้วย +
-    const formattedArtist = artist.replace(/\s+/g, '+');
-    const formattedAlbum = album ? album.replace(/\s+/g, '+') : '';
-    const formattedTrack = songTitle.replace(/\s+/g, '+');
+    const baseNormalize = (value) => (value ?? '').toString().toLowerCase().trim();
+    const stripParentheses = (value) => baseNormalize(value).replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
 
-    const searchQuery = album
-      ? `${formattedArtist},${formattedAlbum},${formattedTrack}`
-      : `${formattedArtist},${formattedTrack}`;
+    const sanitizeTrackOrAlbum = (value) => stripParentheses(value)
+      .replace(/ร่วมกับ/gi, ' ')
+      .replace(/\b(feat\.?|ft\.?|with)\b/gi, ' ')
+      .replace(/\b(explicit|clean)\b/gi, ' ')
+      .replace(/\b(ver\.?|version)\b/gi, ' ')
+      .replace(/[-–—]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const extractParenthesisValues = (value) => {
+      const matches = [...(value ?? '').toString().matchAll(/\(([^)]+)\)/g)];
+      return matches.map((match) => baseNormalize(match[1]).replace(/\s+/g, ' ').trim()).filter(Boolean);
+    };
 
-    const response = await fetch(`https://itunes.apple.com/search?term=${searchQuery}&entity=song&limit=10`, {
-      signal: controller.signal
-    });
+    const createComparableValues = (value, { removeDecorations = false } = {}) => {
+      const normalized = baseNormalize(value);
+      if (!normalized) {
+        return [];
+      }
 
-    clearTimeout(timeoutId);
+      const values = new Set();
+      const addValue = (val) => {
+        if (!val) return;
+        const trimmed = val.replace(/\s+/g, ' ').trim();
+        if (!trimmed) return;
+        values.add(trimmed);
+        values.add(trimmed.replace(/\s+/g, ''));
+      };
 
-    if (!response.ok) {
-      return { error: `iTunes API returned status: ${response.status}` };
-    }
+      addValue(normalized);
 
-    const data = await response.json();
+      const noParentheses = normalized.replace(/\([^)]*\)/g, ' ');
+      addValue(noParentheses);
 
-    const results = Array.isArray(data.results) ? data.results : [];
+      normalized.split(/[,/&]/).forEach((part) => addValue(part));
+      normalized.split(/[-–—]/).forEach((part) => addValue(part));
 
-    if (results.length > 0) {
-      const normalize = (value) => (value ?? '').toString().trim().toLowerCase();
-      const targetArtist = normalize(artist);
-      const targetTrack = normalize(songTitle);
-      const targetAlbum = normalize(album);
+      extractParenthesisValues(value).forEach((part) => addValue(part));
 
-      const matchedItem = results.find(item => {
-        const artistMatch = normalize(item.artistName) === targetArtist;
-        const trackMatch = normalize(item.trackName) === targetTrack;
-        const albumMatch = targetAlbum
-          ? normalize(item.collectionName).includes(targetAlbum)
-          : true;
-        return artistMatch && trackMatch && albumMatch;
+      if (removeDecorations) {
+        addValue(sanitizeTrackOrAlbum(value));
+      }
+
+      return Array.from(values);
+    };
+
+    const valuesOverlap = (aValues, bValues) => {
+      if (!aValues.length || !bValues.length) {
+        return false;
+      }
+      return aValues.some((aVal) =>
+        bValues.some((bVal) => aVal && bVal && (aVal === bVal || aVal.includes(bVal) || bVal.includes(aVal)))
+      );
+    };
+
+    const buildSearchTerms = () => {
+      const terms = new Set();
+      const addTerm = (...parts) => {
+        const term = parts
+          .flat()
+          .map((part) => (part ?? '').toString().trim())
+          .filter(Boolean)
+          .join(' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        if (term) {
+          terms.add(term);
+        }
+      };
+
+      const sanitizedArtist = stripParentheses(artist);
+      const sanitizedTrack = sanitizeTrackOrAlbum(songTitle);
+      const sanitizedAlbum = sanitizeTrackOrAlbum(album);
+      const artistAlternatives = extractParenthesisValues(artist);
+
+      addTerm(artist, album, songTitle);
+      addTerm(artist, songTitle);
+      addTerm(artist, sanitizedTrack);
+      addTerm(sanitizedArtist, sanitizedTrack);
+      addTerm(sanitizedArtist, sanitizedAlbum, sanitizedTrack);
+      addTerm(sanitizedArtist, sanitizedAlbum);
+      addTerm(sanitizedTrack);
+
+      artistAlternatives.forEach((alt) => {
+        addTerm(alt, sanitizedTrack);
+        addTerm(alt, sanitizedAlbum, sanitizedTrack);
       });
 
-      if (matchedItem?.trackViewUrl) {
-        return { success: true, url: matchedItem.trackViewUrl };
+      if (sanitizedAlbum) {
+        addTerm(sanitizedAlbum, sanitizedTrack);
       }
 
-      const fallbackUrl = results[0]?.trackViewUrl;
-      if (fallbackUrl) {
-        return { success: true, url: fallbackUrl };
+      return Array.from(terms);
+    };
+
+    const executeSearch = async (term, country) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const encodedTerm = encodeURIComponent(term);
+
+      try {
+        const countryParam = country ? `&country=${country}` : '';
+        const response = await fetch(
+          `https://itunes.apple.com/search?term=${encodedTerm}&entity=song&limit=10${countryParam}`,
+          { signal: controller.signal }
+        );
+
+        if (!response.ok) {
+          return { error: `iTunes API returned status: ${response.status}` };
+        }
+
+        const data = await response.json();
+        const results = Array.isArray(data.results) ? data.results : [];
+        return { results };
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          return { error: 'iTunes search timeout' };
+        }
+        return { error: error.message };
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    };
+
+    const findBestMatch = (results) => {
+      if (!results.length) {
+        return null;
+      }
+
+      const targetArtistValues = createComparableValues(artist);
+      const targetTrackValues = createComparableValues(songTitle, { removeDecorations: true });
+      const targetAlbumValues = album ? createComparableValues(album, { removeDecorations: true }) : [];
+
+      const evaluateItem = (item) => {
+        const itemArtistValues = createComparableValues(item.artistName);
+        const itemTrackValues = createComparableValues(item.trackName, { removeDecorations: true });
+        const itemAlbumValues = createComparableValues(item.collectionName, { removeDecorations: true });
+
+        const artistMatch = valuesOverlap(targetArtistValues, itemArtistValues);
+        const trackMatch = valuesOverlap(targetTrackValues, itemTrackValues);
+        const albumMatch = !targetAlbumValues.length || valuesOverlap(targetAlbumValues, itemAlbumValues);
+
+        return { artistMatch, trackMatch, albumMatch };
+      };
+
+      const rankedResults = results.map((item) => {
+        const { artistMatch, trackMatch, albumMatch } = evaluateItem(item);
+        const score =
+          (artistMatch ? 3 : 0) +
+          (trackMatch ? 5 : 0) +
+          (albumMatch ? 1 : 0);
+        return { item, artistMatch, trackMatch, albumMatch, score };
+      });
+
+      const perfectMatch = rankedResults.find(
+        ({ artistMatch, trackMatch, albumMatch }) => artistMatch && trackMatch && albumMatch
+      );
+      if (perfectMatch) {
+        return perfectMatch.item;
+      }
+
+      const strongMatch = rankedResults
+        .filter(({ trackMatch }) => trackMatch)
+        .sort((a, b) => b.score - a.score)[0];
+      return strongMatch ? strongMatch.item : results[0];
+    };
+
+    const searchTerms = buildSearchTerms();
+    if (!searchTerms.length) {
+      return { error: 'No search terms provided' };
+    }
+    const countryPriority = ['us', 'kr', 'th', 'jp'];
+
+    let lastResults = [];
+    let lastError = null;
+
+    for (const country of countryPriority) {
+      for (const term of searchTerms) {
+        const { results = [], error } = await executeSearch(term, country);
+        if (error) {
+          lastError = error;
+          continue;
+        }
+
+        if (!results.length) {
+          continue;
+        }
+
+        const matchedItem = findBestMatch(results);
+        if (matchedItem?.trackViewUrl) {
+          return { success: true, url: matchedItem.trackViewUrl };
+        }
+
+        if (!lastResults.length) {
+          lastResults = results;
+        }
+      }
+
+      if (lastResults.length) {
+        break;
       }
     }
 
-    return { error: 'No results found' };
+    const fallbackUrl = lastResults[0]?.trackViewUrl;
+    if (fallbackUrl) {
+      return { success: true, url: fallbackUrl };
+    }
+
+    return lastError ? { error: lastError } : { error: 'No results found' };
   } catch (error) {
     if (error.name === 'AbortError') {
       return { error: 'iTunes search timeout' };
