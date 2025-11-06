@@ -5,6 +5,7 @@ let currentSongKey = null;
 let videoElement = null;
 let originalArtwork = null;
 const animationCache = new Map();
+let settings = { hideFullscreen: true }; // Default settings
 
 function getSongKey(info) {
   if (!info) {
@@ -122,18 +123,7 @@ async function getAnimatedArtwork(appleMusicUrl) {
 
 // ฟังก์ชันแสดง animated artwork
 function displayAnimatedArtwork(videoUrl) {
-  const playerContainer = document.getElementById('player');
-
-  if (!playerContainer) {
-    console.log('Player container not found');
-    return;
-  }
-
-  // ค้นหา artwork container
-  const artworkContainer = playerContainer.querySelector('.image.ytmusic-player-page') ||
-                          playerContainer.querySelector('#song-image') ||
-                          playerContainer.querySelector('.player-page-image');
-
+  const artworkContainer = document.querySelector('.image.ytmusic-player-page, #song-image, .player-page-image');
   if (!artworkContainer) {
     console.log('Artwork container not found');
     return;
@@ -150,11 +140,11 @@ function displayAnimatedArtwork(videoUrl) {
   }
 
   // สร้าง video element ใหม่
-  videoElement = document.createElement('video');
-  videoElement.src = videoUrl;
-  videoElement.autoplay = true;
-  videoElement.loop = true;
-  videoElement.muted = true;
+    videoElement = document.createElement('video');
+    videoElement.src = videoUrl;
+    videoElement.autoplay = true;
+    videoElement.loop = true;
+    videoElement.muted = true;
   videoElement.style.cssText = `
     position: absolute;
     top: 0;
@@ -162,13 +152,12 @@ function displayAnimatedArtwork(videoUrl) {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    z-index: 10;
     border-radius: inherit;
   `;
 
   // ตั้งค่า container ให้เป็น relative
   if (artworkContainer.style.position !== 'relative') {
-    artworkContainer.style.position = 'relative';
+  artworkContainer.style.position = 'relative';
   }
 
   // เพิ่ม video element
@@ -358,3 +347,81 @@ if (checkExtensionContext()) {
     return false;
   });
 }
+
+// โหลดการตั้งค่าและรับฟังการเปลี่ยนแปลง
+async function loadAndListenForSettings() {
+  if (!checkExtensionContext()) return;
+  try {
+    const result = await chrome.storage.sync.get(['hideFullscreen']);
+    settings.hideFullscreen = result.hideFullscreen !== false; // Default to true
+
+    chrome.storage.onChanged.addListener((changes, namespace) => {
+      if (namespace === 'sync' && changes.hideFullscreen) {
+        settings.hideFullscreen = changes.hideFullscreen.newValue !== false;
+        // ถ้าไม่ได้ซ่อนปุ่ม ให้แสดงขึ้นมาทันที
+        if (!settings.hideFullscreen) {
+          restoreOriginalArtwork();
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error with settings:', error);
+  }
+}
+
+loadAndListenForSettings();
+
+// New: Handle the custom fullscreen layout
+function handleFullscreenChange() {
+  const fsContainer = document.getElementById('gemini-fullscreen-container');
+
+  // Entering fullscreen mode and animated artwork is active
+  if (document.fullscreenElement && videoElement && !fsContainer) {
+    console.log('Entering custom fullscreen mode.');
+
+    // 1. Create all the containers
+    const fsContainer = document.createElement('div');
+    fsContainer.id = 'gemini-fullscreen-container';
+
+    const fsArtwork = document.createElement('div');
+    fsArtwork.id = 'gemini-fullscreen-artwork';
+
+    const fsInfo = document.createElement('div');
+    fsInfo.id = 'gemini-fullscreen-info';
+
+    // 2. Move the video into the new artwork container
+    fsArtwork.appendChild(videoElement);
+
+    // 3. Clone song info and add to the info container
+    const titleElement = document.querySelector('.title.ytmusic-player-bar');
+    const artistElement = document.querySelector('.subtitle.ytmusic-player-bar .yt-formatted-string');
+
+    if (titleElement) {
+      const titleClone = titleElement.cloneNode(true);
+      titleClone.className = 'title';
+      fsInfo.appendChild(titleClone);
+    }
+    if (artistElement) {
+      const artistClone = artistElement.cloneNode(true);
+      artistClone.className = 'artist';
+      fsInfo.appendChild(artistClone);
+    }
+
+    // 4. Assemble the container and add to the body
+    fsContainer.appendChild(fsArtwork);
+    fsContainer.appendChild(fsInfo);
+    document.body.appendChild(fsContainer);
+  }
+  // Exiting fullscreen mode
+  else if (!document.fullscreenElement && fsContainer) {
+    console.log('Exiting custom fullscreen mode.');
+
+    // Move the video back to the main player
+    displayAnimatedArtwork(videoElement.src);
+
+    // Remove the fullscreen container
+    fsContainer.remove();
+  }
+}
+
+document.addEventListener('fullscreenchange', handleFullscreenChange, true);

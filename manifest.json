@@ -12,7 +12,8 @@
     "https://music.apple.com/*",
     "https://mvod.itunes.apple.com/*",
     "https://itunes.apple.com/*"
-  ],
+  ], 
+  "options_page": "options.html",
   "background": {
     "service_worker": "background.js"
   },

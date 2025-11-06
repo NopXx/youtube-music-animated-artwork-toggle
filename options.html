@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>YouTube Music Animated Artwork Options</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <h1>🎵 YouTube Music Animated Artwork</h1>
+    <h2>Extension Options</h2>
+
+    <div class="setting-group">
+      <label for="preferredCountry">Preferred Apple Music Country:</label>
+      <select id="preferredCountry">
+        <!-- Options will be populated by JavaScript -->
+      </select>
+      <p class="description">เลือกประเทศที่ต้องการให้ค้นหาเพลงบน Apple Music เป็นอันดับแรก</p>
+    </div>
+
+    <div class="setting-group">
+      <label>Fullscreen Button:</label>
+      <div class="toggle-container-options">
+        <label class="switch">
+          <input type="checkbox" id="hideFullscreenToggle">
+          <span class="slider"></span>
+        </label>
+        <span class="toggle-label" id="fullscreenToggleLabel">Hide when animated</span>
+      </div>
+      <p class="description">ซ่อนปุ่ม Fullscreen เมื่อแสดง Animated Artwork เพื่อให้ดูสะอาดตาขึ้น</p>
+    </div>
+
+    <button id="saveButton">Save Settings</button>
+    <div id="statusMessage" class="status-message"></div>
+
+    <div class="footer">
+      <p>Version 2.0</p>
+    </div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

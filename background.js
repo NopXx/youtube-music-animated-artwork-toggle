@@ -119,7 +119,7 @@ async function searchAppleMusicUrl(songTitle, artist, album) {
       try {
         const countryParam = country ? `&country=${country}` : '';
         const response = await fetch(
-          `https://itunes.apple.com/search?term=${encodedTerm}&entity=song&limit=4${countryParam}`,
+          `https://itunes.apple.com/search?term=${encodedTerm}&entity=musicTrack&media=music&limit=4${countryParam}`,
           { signal: controller.signal }
         );
 
@@ -127,7 +127,10 @@ async function searchAppleMusicUrl(songTitle, artist, album) {
           return { error: `iTunes API returned status: ${response.status}` };
         }
 
-        const data = await response.json();
+        const responseText = await response.text();
+        console.log('iTunes API response:', responseText);
+
+        const data = JSON.parse(responseText);
         const results = Array.isArray(data.results) ? data.results : [];
         return { results };
       } catch (error) {
@@ -187,7 +190,15 @@ async function searchAppleMusicUrl(songTitle, artist, album) {
     if (!searchTerms.length) {
       return { error: 'No search terms provided' };
     }
-    const countryPriority = ['us', 'kr', 'th', 'jp'];
+
+    // ดึง preferredCountry จาก storage
+    const storedSettings = await chrome.storage.sync.get(['preferredCountry']);
+    const preferredCountry = storedSettings.preferredCountry;
+
+    let countryPriority = ['us', 'kr', 'th', 'jp']; // Default priority
+    if (preferredCountry && preferredCountry !== 'auto') {
+      countryPriority = [preferredCountry, ...countryPriority.filter(c => c !== preferredCountry)];
+    }
 
     let lastResults = [];
     let lastError = null;
